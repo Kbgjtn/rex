@@ -74,9 +74,12 @@ pub const Csi = struct {
             },
             'J' => .{ .erase_display = @enumFromInt(self.param(0, 0)) },
             'K' => .{ .erase_line = @enumFromInt(self.param(0, 0)) },
+            'R' => .{ .cursor_abs = .{ .row = self.param(0, 0), .col = self.param(0, 0) } },
             'S' => .{ .scroll_rel = .{ .direction = .up, .n = self.param(0, 1) } },
             'T' => .{ .scroll_rel = .{ .direction = .down, .n = self.param(0, 1) } },
             'm' => .{ .sgr = Sgr.decode(self.params[0..self.param_count]) },
+            // CSI 5i | AUX Port On | Enable aux serial port usually for local serial printer
+            // CSI 4i | AUX Port Off | Disable aux serial port usually for local serial printer
             else => .{ .ignored = {} }, // ignored
         };
     }
@@ -170,6 +173,14 @@ test "CSI: default actions" {
         try std.testing.expectEqualDeep(
             Action{ .scroll_rel = .{ .direction = .down, .n = 1 } },
             csi.finish(0x54), // SD
+        );
+    }
+
+    {
+        defer csi = .empty;
+        try std.testing.expectEqualDeep(
+            Action{ .cursor_abs = .{ .row = 0, .col = 0 } },
+            csi.finish(0x52), // CPR
         );
     }
 }
