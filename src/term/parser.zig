@@ -16,6 +16,7 @@ pub const Csi = struct {
     final: u8,
 
     const NO_PARAM = 0xffff;
+    const NO_INTERMEDIATE = 0xff;
 
     const empty: Csi = .{
         .final = 0,
@@ -25,24 +26,22 @@ pub const Csi = struct {
         .intermediate_count = 0,
 
         .params = [_]u16{NO_PARAM} ** 16,
-        .intermediates = [_]u8{0} ** 4,
+        .intermediates = [_]u8{NO_INTERMEDIATE} ** 4,
     };
 
     pub fn reset(self: *Csi) void {
+        self.final = 0;
+        self.current = NO_PARAM;
         self.param_count = 0;
         self.intermediate_count = 0;
-        self.current = NO_PARAM;
-        self.final = 0;
     }
 
-    pub fn storeParam(self: *Csi) void {
-        if (self.param_count >= self.params.len) {
-            @panic("buffer params overflow!");
+    pub fn pushParam(self: *Csi) void {
+        if (self.param_count < self.params.len) {
+            self.params[self.param_count] = if (self.current == NO_PARAM) 0 else self.current;
+            self.param_count += 1;
+            self.current = NO_PARAM;
         }
-
-        self.params[self.param_count] = if (self.current == NO_PARAM) 0 else self.current;
-        self.param_count += 1;
-        self.current = NO_PARAM;
     }
 
     pub fn finish(self: *Csi, final: u8) Action {
@@ -50,7 +49,7 @@ pub const Csi = struct {
 
         // store trailing parameter
         if (self.current != NO_PARAM or self.param_count > 0) {
-            self.storeParam();
+            self.pushParam();
         }
 
         return self.action();
