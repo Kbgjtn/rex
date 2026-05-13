@@ -63,10 +63,17 @@ pub const Csi = struct {
                 },
 
                 '0'...'9' => blk: {
+                    const digit: u16 = byte - '0';
+
                     if (self.current == no_param) {
-                        self.current = byte - '0';
+                        self.current = digit;
                     } else {
-                        self.current = self.current * 10 + (byte - '0');
+                        const temp: u32 = @as(u32, @intCast(self.current)) * 10 + @as(u32, @intCast(digit));
+                        if (temp > 0xFFFF) {
+                            self.current = no_param;
+                            break :blk .abort;
+                        }
+                        self.current = @intCast(temp);
                     }
 
                     break :blk .next;
