@@ -166,7 +166,33 @@ pub const Csi = struct {
 
     pub fn action(self: *const Csi) Action {
         return switch (self.final) {
-            'A' => .{ .cursor_rel = .{ .direction = .up, .n = self.param(0, 1) } },
+            '@' => blk: {
+                const ps = self.param(0, 1);
+                // [CSI Ps SP @]
+                // Shift left Ps columns(s) (default = 1) (SL), ECMA-48.
+                if (self.intermediateBySpace()) {
+                    break :blk .{ .shift = .{ .direction = .left, .n = ps } };
+                }
+
+                // CSI Ps @
+                // Insert Ps (Blank) Character(s) (default = 1) (ICH).
+                break :blk .{ .padding_character = ps };
+            },
+
+            'A' => blk: {
+                const ps = self.param(0, 1);
+
+                // CSI Ps SP A
+                // Shift right Ps columns(s) (default = 1) (SR), ECMA-48.
+                if (self.intermediateBySpace()) {
+                    break :blk .{ .shift = .{ .direction = .right, .n = ps } };
+                }
+
+                // CSI Ps A
+                // Cursor Up Ps Times (default = 1) (CUU).
+                break :blk .{ .cursor_rel = .{ .direction = .up, .n = ps } };
+            },
+
             'B' => .{ .cursor_rel = .{ .direction = .down, .n = self.param(0, 1) } },
             'C' => .{ .cursor_rel = .{ .direction = .right, .n = self.param(0, 1) } },
             'D' => .{ .cursor_rel = .{ .direction = .left, .n = self.param(0, 1) } },
@@ -174,13 +200,46 @@ pub const Csi = struct {
             'F' => .{ .cursor_previous_line = self.param(0, 1) },
             'G' => .{ .cursor_horizontal_abs = self.param(0, 1) },
             'H', 'f' => .{ // CUP/HVP
+                // CSI Ps I
+                // Cursor Forward Tabulation Ps tab stops (default = 1) (CHT).
                 .cursor_abs = .{ .row = self.param(0, 1), .col = self.param(1, 1) },
             },
             'J' => .{ .erase_display = @enumFromInt(self.param(0, 0)) },
             'K' => .{ .erase_line = @enumFromInt(self.param(0, 0)) },
             'R' => .{ .cursor_abs = .{ .row = self.param(0, 0), .col = self.param(0, 0) } },
+
+            // CSI Ps S
+            // Scroll up Ps lines (default = 1) (SU), VT420, ECMA-48.
             'S' => .{ .scroll_rel = .{ .direction = .up, .n = self.param(0, 1) } },
-            'T' => .{ .scroll_rel = .{ .direction = .down, .n = self.param(0, 1) } },
+
+            // CSI Ps T
+            //      Scroll down Ps lines (default = 1) (SD), VT420.
+            // CSI Ps ^
+            //      Scroll down Ps lines (default = 1) (SD), ECMA-48.
+            'T', '^' => blk: {
+                // DEC/xterm private mode
+                if (self.private_marker != null and self.private_marker.? == '>') {
+                    break :blk .{ .xtrmtitle_reset = self.params[0..self.param_count] };
+                }
+
+                // XTHIMOUSE
+                // Parameters are [func;startx;starty;firstrow;lastrow].
+                // See the section [Mouse Tracking](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Mouse-Tracking).
+                if (self.param_count >= 5) {
+                    break :blk .{
+                        .xthimouse = .{
+                            .func = self.param(0, 0),
+                            .start_x = self.param(1, 0),
+                            .start_y = self.param(2, 0),
+                            .fisrt_row = self.param(3, 0),
+                            .last_row = self.param(4, 0),
+                        },
+                    };
+                }
+
+                break :blk .{ .scroll_rel = .{ .direction = .down, .n = self.param(0, 1) } };
+            },
+
             'm' => .{ .sgr = Sgr.decode(self.params[0..self.param_count]) },
             // CSI 5i | AUX Port On | Enable aux serial port usually for local serial printer
             // CSI 4i | AUX Port Off | Disable aux serial port usually for local serial printer
