@@ -42,18 +42,8 @@ pub const Csi = struct {
     param_count: u4 = 0,
     intermediate_count: u3 = 0,
 
-    current: u16,
-    private_marker: ?u8,
-    final: u8,
-
-    state: enum {
-        params,
-        intermediates,
-        final,
-    },
-
-    const NO_PARAM = 0xffff;
-    const NO_INTERMEDIATE = 0xff;
+    params: [max_params]u16 = [_]u16{0} ** max_params,
+    intermediates: [max_intermediates]u8 = [_]u8{0} ** max_intermediates,
 
     const empty: Csi = .{
         .final = 0,
