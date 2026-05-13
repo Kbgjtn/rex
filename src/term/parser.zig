@@ -156,6 +156,10 @@ pub const Csi = struct {
         return self.params[idx];
     }
 
+    fn intermediateBySpace(self: *const Csi) bool {
+        return self.intermediate_count >= 1 and self.intermediates[0] == ' ';
+    }
+
     pub fn action(self: *const Csi) Action {
         return switch (self.final) {
             'A' => .{ .cursor_rel = .{ .direction = .up, .n = self.param(0, 1) } },
