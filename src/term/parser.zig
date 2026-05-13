@@ -126,12 +126,9 @@ pub const Csi = struct {
         self.intermediate_count = 0;
     }
 
-    pub fn pushIntermediate(self: *Csi, byte: u8) void {
+    fn pushIntermediate(self: *Csi, byte: u8) void {
         if (self.intermediate_count < self.intermediates.len) {
-            self.intermediates[self.intermediate_count] = switch (byte) {
-                0x20...0x2F => byte,
-                else => return,
-            };
+            self.intermediates[self.intermediate_count] = byte;
             self.intermediate_count += 1;
         }
     }
