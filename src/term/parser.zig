@@ -148,27 +148,17 @@ pub const Csi = struct {
         }
     }
 
-    fn finishAndDispatch(self: *Csi, final: u8) Action {
-        self.final = final;
-
-        // store trailing parameter
-        if (self.current != NO_PARAM or self.param_count > 0) {
-            self.pushParam();
-        }
-
-        return self.action();
-    }
-
     pub fn param(self: *const Csi, idx: usize, default: u16) u16 {
         if (idx >= self.param_count) return default;
-        return self.params[idx];
+        const value = self.params[idx];
+        return if (value == no_param) default else value;
     }
 
-    fn intermediateBySpace(self: *const Csi) bool {
+    pub fn intermediateBySpace(self: *const Csi) bool {
         return self.intermediate_count >= 1 and self.intermediates[0] == ' ';
     }
 
-    pub fn action(self: *const Csi) Action {
+    pub fn dispatch(self: *const Csi) Action {
         return switch (self.final) {
             '@' => blk: {
                 const ps = self.param(0, 1);
@@ -222,7 +212,7 @@ pub const Csi = struct {
             //      Scroll down Ps lines (default = 1) (SD), ECMA-48.
             'T', '^' => blk: {
                 // DEC/xterm private mode
-                if (self.private_marker != null and self.private_marker.? == '>') {
+                if (self.private_marker == .gt) {
                     break :blk .{ .xtrmtitle_reset = self.params[0..self.param_count] };
                 }
 
