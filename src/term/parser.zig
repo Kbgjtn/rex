@@ -62,6 +62,59 @@ pub const Csi = struct {
         .intermediates = [_]u8{NO_INTERMEDIATE} ** 4,
     };
 
+    pub fn feed(self: *Csi, byte: u8) Transition {
+        return state: switch (self.state) {
+            .params => switch (byte) {
+                '<', '=', '>', '?' => blk: {
+                    self.private_marker = byte;
+                    break :blk .next;
+                },
+
+                '0'...'9' => blk: {
+                    if (self.current == NO_PARAM) self.current = 0;
+                    self.current = self.current * 10 + (byte - '0');
+                    break :blk .next;
+                },
+
+                ';' => blk: {
+                    self.pushParam();
+                    break :blk .next;
+                },
+
+                ':' => blk: {
+                    break :blk .next;
+                },
+
+                0x20...0x2F => blk: {
+                    self.state = .intermediates;
+                    self.pushIntermediate(byte);
+                    break :blk .next;
+                },
+
+                0x40...0x7E => {
+                    self.state = .final;
+                    continue :state .final;
+                },
+
+                else => .abort,
+            },
+
+            .intermediates => switch (byte) {
+                0x20...0x2F => blk: {
+                    self.pushIntermediate(byte);
+                    break :blk .next;
+                },
+                0x40...0x7E => {
+                    self.state = .final;
+                    continue :state .final;
+                },
+                else => .abort,
+            },
+
+            .final => .{ .complete = self.finish(byte) },
+        };
+    }
+
     pub fn reset(self: *Csi) void {
         self.final = 0;
         self.current = NO_PARAM;
