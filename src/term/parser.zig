@@ -30,7 +30,7 @@ const Transition = union(enum) {
 pub const Csi = struct {
     state: enum { params, intermediates },
     final: u8,
-    current: u16,
+    current: u16 = no_param,
     private_marker: enum(u3) {
         none,
         lt,
@@ -42,20 +42,16 @@ pub const Csi = struct {
     param_count: u4 = 0,
     intermediate_count: u3 = 0,
 
-    params: [max_params]u16 = [_]u16{0} ** max_params,
+    params: [max_params]u16 = [_]u16{no_param} ** max_params,
     intermediates: [max_intermediates]u8 = [_]u8{0} ** max_intermediates,
 
     const empty: Csi = .{
         .final = 0,
         .state = .params,
-        .current = no_param,
         .private_marker = .none,
 
         .param_count = 0,
         .intermediate_count = 0,
-
-        .params = [_]u16{no_param} ** max_params,
-        .intermediates = [_]u8{0} ** max_intermediates,
     };
 
     pub fn feed(self: *Csi, byte: u8) Transition {
