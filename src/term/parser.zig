@@ -117,8 +117,8 @@ pub const Csi = struct {
         self.final = 0;
         self.state = .params;
         self.param_count = 0;
-        self.current = NO_PARAM;
-        self.private_marker = null;
+        self.current = no_param;
+        self.private_marker = .none;
         self.intermediate_count = 0;
     }
 
@@ -129,15 +129,26 @@ pub const Csi = struct {
         }
     }
 
-    pub fn pushParam(self: *Csi) void {
+    fn pushParam(self: *Csi) void {
         if (self.param_count < self.params.len) {
-            self.params[self.param_count] = if (self.current == NO_PARAM) 0 else self.current;
+            // self.params[self.param_count] = if (self.current == no_param) 0 else self.current;
+            self.params[self.param_count] = self.current;
             self.param_count += 1;
-            self.current = NO_PARAM;
+
+            self.current = no_param;
         }
     }
 
-    pub fn finish(self: *Csi, final: u8) Action {
+    fn finish(self: *Csi, byte: u8) void {
+        self.final = byte;
+
+        // store trailing parameter
+        if (self.current != no_param or self.param_count > 0) {
+            self.pushParam();
+        }
+    }
+
+    fn finishAndDispatch(self: *Csi, final: u8) Action {
         self.final = final;
 
         // store trailing parameter
