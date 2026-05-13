@@ -59,16 +59,20 @@ pub const Csi = struct {
     };
 
     pub fn feed(self: *Csi, byte: u8) Transition {
-        return state: switch (self.state) {
+        return switch (self.state) {
             .params => switch (byte) {
                 '<', '=', '>', '?' => blk: {
-                    self.private_marker = byte;
+                    self.private_marker = @enumFromInt(byte - 0x3B);
                     break :blk .next;
                 },
 
                 '0'...'9' => blk: {
-                    if (self.current == NO_PARAM) self.current = 0;
-                    self.current = self.current * 10 + (byte - '0');
+                    if (self.current == no_param) {
+                        self.current = byte - '0';
+                    } else {
+                        self.current = self.current * 10 + (byte - '0');
+                    }
+
                     break :blk .next;
                 },
 
@@ -87,9 +91,9 @@ pub const Csi = struct {
                     break :blk .next;
                 },
 
-                0x40...0x7E => {
-                    self.state = .final;
-                    continue :state .final;
+                0x40...0x7E => blk: {
+                    self.finish(byte);
+                    break :blk .complete;
                 },
 
                 else => .abort,
@@ -100,14 +104,12 @@ pub const Csi = struct {
                     self.pushIntermediate(byte);
                     break :blk .next;
                 },
-                0x40...0x7E => {
-                    self.state = .final;
-                    continue :state .final;
+                0x40...0x7E => blk: {
+                    self.finish(byte);
+                    break :blk .complete;
                 },
                 else => .abort,
             },
-
-            .final => .{ .complete = self.finish(byte) },
         };
     }
 
