@@ -5,6 +5,28 @@ const SgrOp = @import("actions.zig").SgrOp;
 const Control = @import("actions.zig").Control;
 const Utf8Dfa = @import("unicode.zig").Utf8Dfa;
 
+// Definitions
+// Many controls use parameters, shown in italics.  If a control uses a
+// single parameter, only one parameter name is listed.  Some parameters
+// (along with separating ;  characters) may be optional.  Other characters
+// in the control are required.
+//
+// C    A single (required) character.
+// Ps   A single (usually optional) numeric parameter, composed of one or
+//      more digits.
+// Pm   Any number of single numeric parameters, separated by ;
+//      character(s).  Individual values for the parameters are listed with
+//      Ps .
+// Pt   A text parameter composed of printable characters.
+//
+// see details (3. Device Control functions)[https://invisible island.net/xterm/ctlseqs/ctlseqs.html#h3 Device Control functions].
+
+const Transition = union(enum) {
+    complete: Action,
+    next,
+    abort,
+};
+
 pub const Csi = struct {
     params: [16]u16 = [_]u16{0} ** 16,
     intermediates: [4]u8 = [_]u8{0} ** 4,
