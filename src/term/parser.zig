@@ -47,15 +47,15 @@ pub const Csi = struct {
 
     const empty: Csi = .{
         .final = 0,
-        .current = NO_PARAM,
         .state = .params,
+        .current = no_param,
+        .private_marker = .none,
 
         .param_count = 0,
         .intermediate_count = 0,
-        .private_marker = null,
 
-        .params = [_]u16{NO_PARAM} ** 16,
-        .intermediates = [_]u8{NO_INTERMEDIATE} ** 4,
+        .params = [_]u16{no_param} ** max_params,
+        .intermediates = [_]u8{0} ** max_intermediates,
     };
 
     pub fn feed(self: *Csi, byte: u8) Transition {
