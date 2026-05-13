@@ -28,6 +28,10 @@ const Transition = union(enum) {
 };
 
 pub const Csi = struct {
+    // TODO better pass as stack buffer through init fn
+
+    /// `Ps` is a single (usually optional) numeric parameter, composed of one or
+    /// more digits.
     params: [16]u16 = [_]u16{0} ** 16,
     intermediates: [4]u8 = [_]u8{0} ** 4,
 
@@ -35,7 +39,14 @@ pub const Csi = struct {
     intermediate_count: u3 = 0,
 
     current: u16,
+    private_marker: ?u8,
     final: u8,
+
+    state: enum {
+        params,
+        intermediates,
+        final,
+    },
 
     const NO_PARAM = 0xffff;
     const NO_INTERMEDIATE = 0xff;
