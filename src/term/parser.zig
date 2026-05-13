@@ -122,6 +122,16 @@ pub const Csi = struct {
         self.intermediate_count = 0;
     }
 
+    pub fn pushIntermediate(self: *Csi, byte: u8) void {
+        if (self.intermediate_count < self.intermediates.len) {
+            self.intermediates[self.intermediate_count] = switch (byte) {
+                0x20...0x2F => byte,
+                else => return,
+            };
+            self.intermediate_count += 1;
+        }
+    }
+
     pub fn pushParam(self: *Csi) void {
         if (self.param_count < self.params.len) {
             self.params[self.param_count] = if (self.current == NO_PARAM) 0 else self.current;
