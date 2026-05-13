@@ -54,9 +54,11 @@ pub const Csi = struct {
     const empty: Csi = .{
         .final = 0,
         .current = NO_PARAM,
+        .state = .params,
 
         .param_count = 0,
         .intermediate_count = 0,
+        .private_marker = null,
 
         .params = [_]u16{NO_PARAM} ** 16,
         .intermediates = [_]u8{NO_INTERMEDIATE} ** 4,
@@ -191,10 +193,37 @@ test "CSI: default actions" {
     {
         defer csi = .empty;
         try std.testing.expectEqualDeep(
+            Action{ .padding_character = 1 },
+            csi.finish(0x40), // PAD
+        );
+    }
+
+    {
+        defer csi = .empty;
+        csi.pushIntermediate(' ');
+        try std.testing.expectEqualDeep(
+            Action{ .shift = .{ .direction = .left, .n = 1 } },
+            csi.finish(0x40), // Shift left Ps
+        );
+    }
+
+    {
+        defer csi = .empty;
+        try std.testing.expectEqualDeep(
             Action{ .cursor_rel = .{ .n = 1, .direction = .up } },
             csi.finish(0x41), // CUU
         );
     }
+
+    {
+        defer csi = .empty;
+        csi.pushIntermediate(' ');
+        try std.testing.expectEqualDeep(
+            Action{ .shift = .{ .direction = .right, .n = 1 } },
+            csi.finish(0x41), // Shift right Ps
+        );
+    }
+
     {
         defer csi = .empty;
         try std.testing.expectEqualDeep(
@@ -272,7 +301,15 @@ test "CSI: default actions" {
         defer csi = .empty;
         try std.testing.expectEqualDeep(
             Action{ .scroll_rel = .{ .direction = .down, .n = 1 } },
-            csi.finish(0x54), // SD
+            csi.finish(0x54), // SD ('T') not ansi.system
+        );
+    }
+
+    {
+        defer csi = .empty;
+        try std.testing.expectEqualDeep(
+            Action{ .scroll_rel = .{ .direction = .down, .n = 1 } },
+            csi.finish(0x5E), // SD ('^') ECMA-48
         );
     }
 
