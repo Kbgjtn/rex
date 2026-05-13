@@ -119,8 +119,10 @@ pub const Csi = struct {
 
     pub fn reset(self: *Csi) void {
         self.final = 0;
-        self.current = NO_PARAM;
+        self.state = .params;
         self.param_count = 0;
+        self.current = NO_PARAM;
+        self.private_marker = null;
         self.intermediate_count = 0;
     }
 
