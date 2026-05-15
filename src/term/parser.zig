@@ -41,145 +41,168 @@ pub const Separator = enum(u2) {
     semicolon = 2,
 };
 
-/// Number of bits required to store a single `Separator`.
-const separator_bits = @bitSizeOf(Separator);
+/// Maximum number of parameter values supported.
+pub const max_values = 32;
 
-/// Bit mask for a single packed separator field.
+/// Maximum number of intermediate values supported.
+pub const max_intermediates = 4;
+
+/// Fixed-size bit-packed array of `Separator` values.
 ///
-/// Example for `u2`: `0b11`
-const separator_mask = (1 << separator_bits) - 1;
-
-/// Maximum number of separators that fit inside a `u64`.
-/// With 2-bit separators this evaluates to 32.
-const max_separators = @bitSizeOf(u64) / separator_bits;
-
-/// Reads a packed `Separator` from `bits` at `idx`.
-/// Each separator occupies `separator_bits` bits inside the packed `u64`.
+/// It stores exactly `n` separators using a tightly bit-packed representation,
+/// with each `Separator` occupying `@bitSizeOf(Separator)` bits inside a single
+/// unsigned integer.
 ///
-/// Panics in Debug mode if `index >= max_separators`.
-fn getSeparator(bits: u64, index: usize) Separator {
-    std.debug.assert(index < max_separators);
-
-    const shift: u6 = @truncate(index * separator_bits);
-    return @enumFromInt(@as(u2, @truncate(bits >> @intCast(shift))));
-}
-
-/// Writes `value` into the packed separator bitfield at `idx`.
-/// Existing bits at the target slot are cleared before the new value
-/// is written.
+/// To read or written an element use method `get` or `set`,
+/// which perform bit shifting and masking into the underlying storage.
 ///
-/// Panics in Debug mode if `index >= max_separators`.
-fn setSeparator(bits: *u64, index: usize, value: Separator) void {
-    std.debug.assert(index < max_separators);
+/// NOTE
+/// * The underlying integer type is automatically
+///   selected to fit `n * @bitSizeOf(Separator)` bits.
+/// * Out-of-bounds access is asserted in debug builds.
+pub fn SeparatorPacked(comptime n: usize) type {
+    const bits_per = @bitSizeOf(Separator);
+    const total = n * bits_per;
+    const T = std.meta.Int(.unsigned, total);
 
-    const shift: u6 = @truncate(index * separator_bits);
-    const mask: u64 = @as(u64, separator_mask) << shift;
-    bits.* =
-        (bits.* & ~mask) |
-        (@as(u64, @intFromEnum(value)) << shift);
-}
+    return struct {
+        bits: T,
 
-fn testRoundTrip(source: []const Separator) !void {
-    var bits: u64 = 0;
+        const Self = @This();
+        pub const init: Self = .{ .bits = 0 };
 
-    for (source, 0..) |sep, i| {
-        setSeparator(&bits, i, sep);
-    }
+        /// Read separator at index
+        pub fn get(self: Self, index: usize) Separator {
+            std.debug.assert(index < n);
 
-    for (source, 0..) |expected, i| {
-        try std.testing.expectEqual(
-            expected,
-            getSeparator(bits, i),
-        );
-    }
-}
-test "separator" {
-    try testRoundTrip(&[_]Separator{.end});
-    try testRoundTrip(&[_]Separator{.colon});
-    try testRoundTrip(&[_]Separator{.semicolon});
-    try testRoundTrip(&[_]Separator{ .colon, .semicolon, .end });
-}
-
-test "separator: round trip" {
-    try testRoundTrip(&[_]Separator{
-        .colon,
-        .semicolon,
-        .end,
-        .colon,
-    });
-}
-
-test "separator: maximum capacity" {
-    var bits: u64 = 0;
-
-    for (0..32) |i| {
-        setSeparator(&bits, i, .semicolon);
-    }
-
-    for (0..32) |i| {
-        try std.testing.expectEqual(
-            Separator.semicolon,
-            getSeparator(bits, i),
-        );
-    }
-}
-
-test "separator: overwrite existing separator" {
-    var bits: u64 = 0;
-
-    setSeparator(&bits, 5, .colon);
-    try std.testing.expectEqual(
-        Separator.colon,
-        getSeparator(bits, 5),
-    );
-
-    setSeparator(&bits, 5, .end);
-    try std.testing.expectEqual(
-        Separator.end,
-        getSeparator(bits, 5),
-    );
-}
-
-test "separator: first and last index" {
-    var bits: u64 = 0;
-
-    setSeparator(&bits, 0, .colon);
-    setSeparator(&bits, 31, .semicolon);
-
-    try std.testing.expectEqual(
-        Separator.colon,
-        getSeparator(bits, 0),
-    );
-
-    try std.testing.expectEqual(
-        Separator.semicolon,
-        getSeparator(bits, 31),
-    );
-}
-
-test "separator: random round trip" {
-    var prng = std.Random.DefaultPrng.init(0);
-    const rand = prng.random();
-
-    for (0..10_000) |_| {
-        var bits: u64 = 0;
-        var expected: [32]Separator = undefined;
-
-        for (0..32) |i| {
-            const sep: Separator = @enumFromInt(rand.intRangeLessThan(u2, 0, 3));
-
-            expected[i] = sep;
-            setSeparator(&bits, i, sep);
-        }
-
-        for (0..32) |i| {
-            try std.testing.expectEqual(
-                expected[i],
-                getSeparator(bits, i),
+            const shift = index * bits_per;
+            return @enumFromInt(
+                @as(u2, @truncate(self.bits >> @intCast(shift))),
             );
         }
+
+        /// Write separator at index
+        pub fn set(self: *Self, index: usize, value: Separator) void {
+            std.debug.assert(index < n);
+
+            const shift = index * bits_per;
+            const mask = (@as(T, 1) << bits_per) - 1;
+            const shifted_mask = mask << @intCast(shift);
+
+            self.bits =
+                (self.bits & ~shifted_mask) |
+                (@as(T, @intFromEnum(value)) << @intCast(shift));
+        }
+    };
+}
+
+test "SeparatorPacked basic set/get" {
+    var s: SeparatorPacked(8) = .init;
+
+    s.set(0, .colon);
+    s.set(1, .semicolon);
+    s.set(2, .end);
+
+    try std.testing.expectEqual(.colon, s.get(0));
+    try std.testing.expectEqual(.semicolon, s.get(1));
+    try std.testing.expectEqual(.end, s.get(2));
+}
+
+test "SeparatorPacked overwrite works" {
+    var s: SeparatorPacked(4) = .init;
+
+    s.set(1, .colon);
+    try std.testing.expectEqual(.colon, s.get(1));
+
+    s.set(1, .semicolon);
+    try std.testing.expectEqual(.semicolon, s.get(1));
+}
+
+test "SeparatorPacked boundary indices" {
+    var s: SeparatorPacked(16) = .init;
+
+    s.set(0, .colon);
+    s.set(15, .semicolon);
+
+    try std.testing.expectEqual(.colon, s.get(0));
+    try std.testing.expectEqual(.semicolon, s.get(15));
+}
+
+test "SeparatorPacked full capacity stress test" {
+    var s: SeparatorPacked(32) = .init;
+
+    // fill pattern
+    for (0..32) |i| {
+        const v: Separator = if (i % 3 == 0)
+            .colon
+        else if (i % 3 == 1)
+            .semicolon
+        else
+            .end;
+
+        s.set(i, v);
+    }
+
+    // verify
+    for (0..32) |i| {
+        const expected: Separator = if (i % 3 == 0)
+            .colon
+        else if (i % 3 == 1)
+            .semicolon
+        else
+            .end;
+
+        try std.testing.expectEqual(expected, s.get(i));
     }
 }
+
+test "SeparatorPacked alternating pattern" {
+    var s: SeparatorPacked(16) = .init;
+
+    for (0..16) |i| {
+        s.set(i, if (i % 2 == 0) .colon else .semicolon);
+    }
+
+    for (0..16) |i| {
+        const expected: Separator = if (i % 2 == 0)
+            .colon
+        else
+            .semicolon;
+
+        try std.testing.expectEqual(expected, s.get(i));
+    }
+}
+
+test "SeparatorPacked default is zeroed" {
+    var s: SeparatorPacked(10) = .init;
+    for (0..10) |i| {
+        try std.testing.expectEqual(.end, s.get(i));
+    }
+}
+
+test "SeparatorPacked fuzz random" {
+    const S = SeparatorPacked(32);
+
+    var s = S.init;
+    var expected: [32]Separator = undefined;
+
+    var prng = std.Random.DefaultPrng.init(12345);
+    const rand = prng.random();
+
+    for (0..32) |i| {
+        const v: Separator = @enumFromInt(
+            rand.intRangeAtMost(u2, 0, 2),
+        );
+
+        expected[i] = v;
+        s.set(i, v);
+    }
+
+    for (0..32) |i| {
+        try std.testing.expectEqual(expected[i], s.get(i));
+    }
+}
+
 pub const Csi = struct {
     state: enum { params, intermediates },
     final: u8,
