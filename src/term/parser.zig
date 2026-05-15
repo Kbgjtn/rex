@@ -78,6 +78,108 @@ fn setSeparator(bits: *u64, index: usize, value: Separator) void {
         (bits.* & ~mask) |
         (@as(u64, @intFromEnum(value)) << shift);
 }
+
+fn testRoundTrip(source: []const Separator) !void {
+    var bits: u64 = 0;
+
+    for (source, 0..) |sep, i| {
+        setSeparator(&bits, i, sep);
+    }
+
+    for (source, 0..) |expected, i| {
+        try std.testing.expectEqual(
+            expected,
+            getSeparator(bits, i),
+        );
+    }
+}
+test "separator" {
+    try testRoundTrip(&[_]Separator{.end});
+    try testRoundTrip(&[_]Separator{.colon});
+    try testRoundTrip(&[_]Separator{.semicolon});
+    try testRoundTrip(&[_]Separator{ .colon, .semicolon, .end });
+}
+
+test "separator: round trip" {
+    try testRoundTrip(&[_]Separator{
+        .colon,
+        .semicolon,
+        .end,
+        .colon,
+    });
+}
+
+test "separator: maximum capacity" {
+    var bits: u64 = 0;
+
+    for (0..32) |i| {
+        setSeparator(&bits, i, .semicolon);
+    }
+
+    for (0..32) |i| {
+        try std.testing.expectEqual(
+            Separator.semicolon,
+            getSeparator(bits, i),
+        );
+    }
+}
+
+test "separator: overwrite existing separator" {
+    var bits: u64 = 0;
+
+    setSeparator(&bits, 5, .colon);
+    try std.testing.expectEqual(
+        Separator.colon,
+        getSeparator(bits, 5),
+    );
+
+    setSeparator(&bits, 5, .end);
+    try std.testing.expectEqual(
+        Separator.end,
+        getSeparator(bits, 5),
+    );
+}
+
+test "separator: first and last index" {
+    var bits: u64 = 0;
+
+    setSeparator(&bits, 0, .colon);
+    setSeparator(&bits, 31, .semicolon);
+
+    try std.testing.expectEqual(
+        Separator.colon,
+        getSeparator(bits, 0),
+    );
+
+    try std.testing.expectEqual(
+        Separator.semicolon,
+        getSeparator(bits, 31),
+    );
+}
+
+test "separator: random round trip" {
+    var prng = std.Random.DefaultPrng.init(0);
+    const rand = prng.random();
+
+    for (0..10_000) |_| {
+        var bits: u64 = 0;
+        var expected: [32]Separator = undefined;
+
+        for (0..32) |i| {
+            const sep: Separator = @enumFromInt(rand.intRangeLessThan(u2, 0, 3));
+
+            expected[i] = sep;
+            setSeparator(&bits, i, sep);
+        }
+
+        for (0..32) |i| {
+            try std.testing.expectEqual(
+                expected[i],
+                getSeparator(bits, i),
+            );
+        }
+    }
+}
 pub const Csi = struct {
     state: enum { params, intermediates },
     final: u8,
