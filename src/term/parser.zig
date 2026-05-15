@@ -27,6 +27,57 @@ const Transition = union(enum) {
     abort,
 };
 
+/// Packed separator token used by the parser.
+/// Stored as a 2-bit value inside a `u64` bitfield.
+/// Up to 32 separators can be packed into a single `u64`.
+pub const Separator = enum(u2) {
+    /// Final parameter in the sequence.
+    end = 0,
+
+    /// Continue parsing sub-parameters.
+    colon = 1,
+
+    /// Advance to the next parameter.
+    semicolon = 2,
+};
+
+/// Number of bits required to store a single `Separator`.
+const separator_bits = @bitSizeOf(Separator);
+
+/// Bit mask for a single packed separator field.
+///
+/// Example for `u2`: `0b11`
+const separator_mask = (1 << separator_bits) - 1;
+
+/// Maximum number of separators that fit inside a `u64`.
+/// With 2-bit separators this evaluates to 32.
+const max_separators = @bitSizeOf(u64) / separator_bits;
+
+/// Reads a packed `Separator` from `bits` at `idx`.
+/// Each separator occupies `separator_bits` bits inside the packed `u64`.
+///
+/// Panics in Debug mode if `index >= max_separators`.
+fn getSeparator(bits: u64, index: usize) Separator {
+    std.debug.assert(index < max_separators);
+
+    const shift: u6 = @truncate(index * separator_bits);
+    return @enumFromInt(@as(u2, @truncate(bits >> @intCast(shift))));
+}
+
+/// Writes `value` into the packed separator bitfield at `idx`.
+/// Existing bits at the target slot are cleared before the new value
+/// is written.
+///
+/// Panics in Debug mode if `index >= max_separators`.
+fn setSeparator(bits: *u64, index: usize, value: Separator) void {
+    std.debug.assert(index < max_separators);
+
+    const shift: u6 = @truncate(index * separator_bits);
+    const mask: u64 = @as(u64, separator_mask) << shift;
+    bits.* =
+        (bits.* & ~mask) |
+        (@as(u64, @intFromEnum(value)) << shift);
+}
 pub const Csi = struct {
     state: enum { params, intermediates },
     final: u8,
