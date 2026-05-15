@@ -28,8 +28,6 @@ const Transition = union(enum) {
 };
 
 /// Packed separator token used by the parser.
-/// Stored as a 2-bit value inside a `u64` bitfield.
-/// Up to 32 separators can be packed into a single `u64`.
 pub const Separator = enum(u2) {
     /// Final parameter in the sequence.
     end = 0,
