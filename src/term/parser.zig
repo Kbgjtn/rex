@@ -27,6 +27,12 @@ const Transition = union(enum) {
     abort,
 };
 
+/// Maximum number of parameter values supported.
+pub const max_values = 32;
+
+/// Maximum number of intermediate values supported.
+pub const max_intermediates = 4;
+
 /// Packed separator token used by the parser.
 pub const Separator = enum(u2) {
     /// Final parameter in the sequence.
@@ -38,12 +44,6 @@ pub const Separator = enum(u2) {
     /// Advance to the next parameter.
     semicolon = 2,
 };
-
-/// Maximum number of parameter values supported.
-pub const max_values = 32;
-
-/// Maximum number of intermediate values supported.
-pub const max_intermediates = 4;
 
 /// Fixed-size bit-packed array of `Separator` values.
 ///
